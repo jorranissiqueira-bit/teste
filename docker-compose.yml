@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: valuebet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: valuebet
+      POSTGRES_PASSWORD: valuebet
+      POSTGRES_DB: valuebet
+    ports:
+      - "5432:5432"
+    volumes:
+      - valuebet_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U valuebet"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+    container_name: valuebet-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://valuebet:valuebet@postgres:5432/valuebet
+      JWT_SECRET: change-this-to-a-random-secret-in-production
+      ODDS_API_KEY: ${ODDS_API_KEY:-}
+      PORT: "3000"
+      NODE_ENV: development
+      TZ: America/Sao_Paulo
+      CLIENT_URL: http://localhost:5173
+    ports:
+      - "3000:3000"
+
+  client:
+    build:
+      context: ./client
+      args:
+        VITE_API_URL: http://localhost:3000
+    container_name: valuebet-client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "5173:80"
+
+volumes:
+  valuebet_pgdata:
